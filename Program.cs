@@ -15,28 +15,45 @@ kernel.Config.AddAzureOpenAITextCompletionService(
     apikey        // Azure OpenAI *Key*
 );
 
+// string summarizePrompt = @"
+// {{$input}}
+
+// Give me the a TLDR in 5 words.";
+
 string summarizePrompt = @"
 {{$input}}
 
-Give me the a TLDR in 5 words.";
+5つの単語で要約してください。";
+
+// string haikuPrompt = @"
+// {{$input}}
+
+// Write a futuristic haiku about it.";
 
 string haikuPrompt = @"
 {{$input}}
 
-Write a futuristic haiku about it.";
+未来的な俳句を書いてください。";
 
 var summarize = kernel.CreateSemanticFunction(summarizePrompt);
 var haikuWriter = kernel.CreateSemanticFunction(haikuPrompt);
 
+// string inputText = @"
+// 1) A robot may not injure a human being or, through inaction,
+// allow a human being to come to harm.
+
+// 2) A robot must obey orders given it by human beings except where
+// such orders would conflict with the First Law.
+
+// 3) A robot must protect its own existence as long as such protection
+// does not conflict with the First or Second Law.";
+
 string inputText = @"
-1) A robot may not injure a human being or, through inaction,
-allow a human being to come to harm.
+1) ロボットは人間を傷つけてはならず、また、何もしないことによって人間が危害を被ることを許してはなりません。
 
-2) A robot must obey orders given it by human beings except where
-such orders would conflict with the First Law.
+2) ロボットは、その命令が第一法則と矛盾しない限り、人間によって与えられた命令に従わなければなりません。
 
-3) A robot must protect its own existence as long as such protection
-does not conflict with the First or Second Law.";
+3) ロボットは、その保護が第一法則または第二法則と矛盾しない限り、自己の存在を守らなければなりません。";
 
 var output = await kernel.RunAsync(inputText, summarize, haikuWriter);
 
