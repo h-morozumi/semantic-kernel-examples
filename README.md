@@ -7,5 +7,9 @@ export AOAI_APIKEY="xxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ```
+dotnet add package Newtonsoft.Json
+```
+
+```
 dotnet run
 ```

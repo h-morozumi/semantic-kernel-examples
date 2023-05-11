@@ -1,11 +1,18 @@
 ﻿using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.CoreSkills;
+using Microsoft.SemanticKernel.Orchestration;
+using Microsoft.SemanticKernel.KernelExtensions;
 
-var kernel = Kernel.Builder.Build();
+using MySkillsDirectory;
 
 var endpoint = Environment.GetEnvironmentVariable("AOAI_ENDPOINT");
 var deployname = Environment.GetEnvironmentVariable("AOAI_DEPLOYNAME");
 var apikey = Environment.GetEnvironmentVariable("AOAI_APIKEY");
 
+IKernel kernel = Microsoft.SemanticKernel.Kernel.Builder.Build();
+// kernel.Config.AddOpenAITextCompletionService(
+//     "davinci", "text-davinci-003", ""
+// );
 // For Azure Open AI details please see
 // https://learn.microsoft.com/azure/cognitive-services/openai/quickstart?pivots=rest-api
 kernel.Config.AddAzureOpenAITextCompletionService(
@@ -15,50 +22,49 @@ kernel.Config.AddAzureOpenAITextCompletionService(
     apikey        // Azure OpenAI *Key*
 );
 
-// string summarizePrompt = @"
-// {{$input}}
+// Plannerスキルを使用できるようにする。
+var planner = kernel.ImportSkill(new PlannerSkill(kernel));
 
-// Give me the a TLDR in 5 words.";
+var skillsDirectory = Path.Combine(System.IO.Directory.GetCurrentDirectory(), "MySkillsDirectory");
+// Semantic Functionをインポート
+kernel.ImportSemanticSkillFromDirectory(skillsDirectory, "MyRetrieverSkill");
+// Native Functionをインポート
+kernel.ImportSkill(new MyRetrieverSkill(), "MyRetrieverSkill");
 
-string summarizePrompt = @"
-{{$input}}
+// var ask = "GPTをアシスタントとして使うための情報があるか検索して要約してください";
+// var ask = "GPTに関して、アシスタントとして使う方法と、出力が事実か確かめる方法についてそれぞれ検索して結果をまとめて要約してください";
+var ask = "織田信長について教えてください。";
+var originalPlan = await kernel.RunAsync(ask, planner["CreatePlan"]);
 
-5つの単語で要約してください。";
+Console.WriteLine("Original plan:\n");
+Console.WriteLine(originalPlan.Variables.ToPlan().PlanString);
 
-// string haikuPrompt = @"
-// {{$input}}
+var executionResults = originalPlan;
+int step = 1;
+int maxSteps = 10;
+while (!executionResults.Variables.ToPlan().IsComplete && step < maxSteps)
+{
+    var results = await kernel.RunAsync(executionResults.Variables, planner["ExecutePlan"]);
+    if (results.Variables.ToPlan().IsSuccessful)
+    {
+        Console.WriteLine($"Step {step} - Execution results:\n");
+        Console.WriteLine(results.Variables.ToPlan().PlanString);
 
-// Write a futuristic haiku about it.";
-
-string haikuPrompt = @"
-{{$input}}
-
-未来的な俳句を書いてください。";
-
-var summarize = kernel.CreateSemanticFunction(summarizePrompt);
-var haikuWriter = kernel.CreateSemanticFunction(haikuPrompt);
-
-// string inputText = @"
-// 1) A robot may not injure a human being or, through inaction,
-// allow a human being to come to harm.
-
-// 2) A robot must obey orders given it by human beings except where
-// such orders would conflict with the First Law.
-
-// 3) A robot must protect its own existence as long as such protection
-// does not conflict with the First or Second Law.";
-
-string inputText = @"
-1) ロボットは人間を傷つけてはならず、また、何もしないことによって人間が危害を被ることを許してはなりません。
-
-2) ロボットは、その命令が第一法則と矛盾しない限り、人間によって与えられた命令に従わなければなりません。
-
-3) ロボットは、その保護が第一法則または第二法則と矛盾しない限り、自己の存在を守らなければなりません。";
-
-var output = await kernel.RunAsync(inputText, summarize, haikuWriter);
-
-Console.WriteLine(output);
-
-// Output => Robots protect us all
-//           No harm to humans they bring
-//           Peaceful coexistence
+        if (results.Variables.ToPlan().IsComplete)
+        {
+            Console.WriteLine($"Step {step} - COMPLETE!");
+            Console.WriteLine(results.Variables.ToPlan().Result);
+            break;
+        }
+    }
+    else
+    {
+        Console.WriteLine($"Step {step} - Execution failed:");
+        Console.WriteLine(results.Variables.ToPlan().Result);
+        break;
+    }
+    
+    executionResults = results;
+    step++;
+    Console.WriteLine("");
+}

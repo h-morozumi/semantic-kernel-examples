@@ -1,0 +1,4 @@
+Summarize input sentence in three lines in Japanese.
+
+input={{$input}}
+summary=
